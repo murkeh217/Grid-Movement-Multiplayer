@@ -9,7 +9,6 @@ using TMPro;
 
 public class GameManager : MonoBehaviourPunCallbacks, IPunObservable
 {
-    private bool isGameStarted = false;
     private int currentPlayerIndex = 0;
     private Player[] players;
     private int[] playerScores;
@@ -18,8 +17,9 @@ public class GameManager : MonoBehaviourPunCallbacks, IPunObservable
     public GameObject[] playerPrefab; // Array of player prefabs
     public Transform[] spawnPoint; // Array of spawn points
     private const string TurnOwnerKey = "TurnOwner";
-    private int turnOwner = -1; // Default value indicating no turn owner
+    private int turnOwner = 0; // Default value indicating no turn owner
     public TMP_Text turnText;
+    private bool isCurrentPlayer;
 
     private void Start()
     {
@@ -73,18 +73,51 @@ public class GameManager : MonoBehaviourPunCallbacks, IPunObservable
     {
         Debug.Log("New player entered the room: " + newPlayer.NickName);
         Debug.Log("Current room player count: " + PhotonNetwork.CurrentRoom.PlayerCount);
-        Debug.Log("isGameStarted: " + isGameStarted);
 
-        if (PhotonNetwork.CurrentRoom.PlayerCount == 2 && !isGameStarted)
+        if (PhotonNetwork.CurrentRoom.PlayerCount == 2)
         {
+            Debug.Log("Starting game...");
             StartGame();
+        }
+        else
+        {
+            // Check if it's the local player's turn
+            if (turnOwner == PhotonNetwork.LocalPlayer.ActorNumber)
+            {
+                endTurnButton.interactable = true;
+            }
         }
     }
 
     private void StartGame()
     {
-        Debug.Log("StartGame() called");
+        players = PhotonNetwork.PlayerList;
+        currentPlayerIndex = 0;
 
+        // Set the initial turn text and visibility
+        SetTurnText(players[currentPlayerIndex]);
+
+        // Set the turn owner on the master client
+        if (PhotonNetwork.IsMasterClient)
+        {
+            SetTurnOwner(players[currentPlayerIndex].ActorNumber);
+            endTurnButton.interactable = true; // Enable end turn button for the master client
+        }
+        else
+        {
+            endTurnButton.interactable = false; // Disable end turn button for other players initially
+        }
+
+        // Instantiate the player for the local client
+        if (PhotonNetwork.IsConnectedAndReady)
+        {
+            photonView.RPC("RPC_InstantiatePlayer", RpcTarget.All);
+        }
+    }
+
+    [PunRPC]
+    private void RPC_InstantiatePlayer()
+    {
         // Check if all required components are assigned
         if (playerPrefab == null)
         {
@@ -98,53 +131,38 @@ public class GameManager : MonoBehaviourPunCallbacks, IPunObservable
             return;
         }
 
-        // Get a random spawn point index
-        int spawnIndex = Random.Range(0, spawnPoint.Length);
+        // Get the spawn point index for the local player
+        int spawnIndex = GetSpawnIndexForPlayer(PhotonNetwork.LocalPlayer.ActorNumber);
 
-        // Instantiate a random player prefab at the selected spawn point
-        GameObject player = PhotonNetwork.Instantiate(playerPrefab[Random.Range(0, playerPrefab.Length)].name, spawnPoint[spawnIndex].position, spawnPoint[spawnIndex].rotation);
+        // Instantiate the player prefab at the selected spawn point
+        GameObject player = PhotonNetwork.Instantiate(playerPrefab[spawnIndex].name, spawnPoint[spawnIndex].position, spawnPoint[spawnIndex].rotation);
 
         // Set the player's position and rotation locally
         player.transform.position = spawnPoint[spawnIndex].position;
         player.transform.rotation = spawnPoint[spawnIndex].rotation;
-
-        // Set the isGameStarted flag to true
-        isGameStarted = true;
-
-        // Set the initial turn text and visibility
-        SetTurnText(players[currentPlayerIndex]);
     }
 
-    private void Update()
+    private int GetSpawnIndexForPlayer(int actorNumber)
     {
-        if (!PhotonNetwork.IsMasterClient || !isGameStarted)
-            return;
-
-        // Check for conditions to end the turn
-        // Example: Simulating the end of the player's turn after a specific time
-
-        if (Input.GetKeyDown(KeyCode.Space))
+        // Find the player with the given actor number and return the corresponding spawn point index
+        for (int i = 0; i < players.Length; i++)
         {
-            EndTurn();
+            if (players[i].ActorNumber == actorNumber)
+            {
+                return i;
+            }
         }
 
-        // Update turn text visibility and content
-        SetTurnTextVisibility(currentPlayerIndex == playerController.PlayerIndex);
-        turnText.text = "Player " + currentPlayerIndex + "'s Turn";
-    }
-
-    private void SetTurnTextVisibility(bool isVisible)
-    {
-        turnText.gameObject.SetActive(isVisible);
+        return -1; // Player not found, return an invalid index
     }
 
     public void EndTurn()
     {
+        // Disable the end turn button to prevent multiple clicks
+        endTurnButton.interactable = false;
+
         // Increment the current player index and wrap around if necessary
         currentPlayerIndex = (currentPlayerIndex + 1) % players.Length;
-
-        // Update the turn text visibility for the new current player
-        SetTurnTextVisibility(players[currentPlayerIndex].ActorNumber == PhotonNetwork.LocalPlayer.ActorNumber);
 
         // Inform the players about the new turn
         photonView.RPC("RPC_SetTurn", RpcTarget.All, currentPlayerIndex);
@@ -155,15 +173,27 @@ public class GameManager : MonoBehaviourPunCallbacks, IPunObservable
     {
         Debug.LogFormat("Setting turn for Player {0}.", playerIndex);
 
+        currentPlayerIndex = playerIndex;
+
         for (int i = 0; i < players.Length; i++)
         {
-            // Enable or disable the "End Turn" button based on the current player's turn
-            endTurnButton.interactable = (i == playerIndex);
+            isCurrentPlayer = (i == playerIndex);
+            Player currentPlayer = players[i];
 
             // Display turn text for the current player
-            bool isCurrentPlayer = (i == playerIndex);
-            SetTurnTextVisibility(isCurrentPlayer);
+            SetTurnText(currentPlayer);
         }
+
+        // Update turn text visibility based on the current active player
+        SetTurnTextVisibility(true);
+
+        // Enable the end turn button for the current player
+        UpdateTurnButtonInteractability();
+    }
+
+    private void UpdateTurnButtonInteractability()
+    {
+        endTurnButton.interactable = (players[currentPlayerIndex].ActorNumber == PhotonNetwork.LocalPlayer.ActorNumber);
     }
 
     private void SetTurnOwner(int playerId)
@@ -178,44 +208,48 @@ public class GameManager : MonoBehaviourPunCallbacks, IPunObservable
 
     public override void OnPlayerPropertiesUpdate(Player targetPlayer, Hashtable changedProps)
     {
-        if (changedProps.ContainsKey("nextPlayerId"))
+        if (changedProps.ContainsKey(TurnOwnerKey))
         {
-            int nextPlayerId = (int)changedProps["nextPlayerId"];
-            // Use the nextPlayerId value as needed
+            turnOwner = (int)changedProps[TurnOwnerKey];
 
-            // Update the turn text visibility based on the current player's turn
-            bool isCurrentPlayerTurn = (nextPlayerId == PhotonNetwork.LocalPlayer.ActorNumber);
-            SetTurnTextVisibility(isCurrentPlayerTurn);
+            // Enable or disable the end turn button based on the current player's turn
+            endTurnButton.interactable = (turnOwner == PhotonNetwork.LocalPlayer.ActorNumber);
         }
     }
 
-    // Example method to pass the turn to the next player
-    public void PassTurnToNextPlayer()
+    private void SetTurnTextVisibility(bool isVisible)
     {
-        // Determine the next player in the turn order
-        int nextPlayerId = GetNextPlayerId();
-
-        // Set the turn owner to the next player
-        SetTurnOwner(nextPlayerId);
+        if (PhotonNetwork.LocalPlayer.ActorNumber == players[currentPlayerIndex].ActorNumber)
+        {
+            turnText.gameObject.SetActive(isVisible);
+        }
+        else
+        {
+            turnText.gameObject.SetActive(false);
+        }
     }
 
-    private int GetNextPlayerId()
+    private void SetTurnText(Player player)
     {
-        // Implement your logic to determine the next player's ID
-        // For example, you can use a list of player IDs and cycle through them
-
-        // Return the ID of the next player
-        return currentPlayerIndex;
+        if (PhotonNetwork.LocalPlayer.ActorNumber == player.ActorNumber)
+        {
+            turnText.text = "Your Turn";
+        }
+        else
+        {
+            turnText.text = "Opponent's Turn";
+        }
     }
 
     public void OnPhotonSerializeView(PhotonStream stream, PhotonMessageInfo info)
     {
-        // Implement serialization logic here if needed
-    }
-
-    private void SetTurnText(Player currentPlayer)
-    {
-        string playerName = currentPlayer.NickName;
-        turnText.text = "Turn: " + playerName;
+        if (stream.IsWriting)
+        {
+            stream.SendNext(turnOwner);
+        }
+        else
+        {
+            turnOwner = (int)stream.ReceiveNext();
+        }
     }
 }

@@ -793,7 +793,7 @@ Light:
   m_BounceIntensity: 1
   m_ColorTemperature: 6570
   m_UseColorTemperature: 0
-  m_BoundingSphereOverride: {x: 0, y: 0, z: 0, w: 7.1926e-40}
+  m_BoundingSphereOverride: {x: 0, y: 1.1e-44, z: 0, w: 3.4e-44}
   m_UseBoundingSphereOverride: 0
   m_UseViewFrustumForShadowCasterCull: 1
   m_ShadowRadius: 0
@@ -882,8 +882,6 @@ MonoBehaviour:
   spawnPoint:
   - {fileID: 1961523422}
   - {fileID: 585990225}
-  - {fileID: 1541485520}
-  - {fileID: 1936881377}
   turnText: {fileID: 190462649}
 --- !u!4 &1810530365
 Transform:
