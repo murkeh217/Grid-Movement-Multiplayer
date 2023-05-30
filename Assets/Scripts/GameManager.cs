@@ -2,6 +2,7 @@ using UnityEngine;
 using Photon.Pun;
 using Photon.Realtime;
 using UnityEngine.UI;
+using System.Linq;
 
 public class GameManager : MonoBehaviourPunCallbacks
 {
@@ -9,9 +10,10 @@ public class GameManager : MonoBehaviourPunCallbacks
     private int currentPlayerIndex = 0;
     private Player[] players;
     private int[] playerScores;
-    private Button endTurnButton;
+    public Button endTurnButton;
 
-    public GameObject[] playerPrefabs; // Array of player prefabs to spawn
+public GameObject[] playerPrefab; // Array of player prefabs
+    public Transform[] spawnPoint; // Array of spawn points
 
     private void Start()
     {
@@ -20,9 +22,7 @@ public class GameManager : MonoBehaviourPunCallbacks
             Debug.Log("Connecting to Photon server...");
             PhotonNetwork.ConnectUsingSettings();
         }
-        
-        endTurnButton = GameObject.Find("End Turn Button").GetComponent<Button>();
-        endTurnButton.onClick.AddListener(EndTurn);
+
         endTurnButton.interactable = false; // Disable the button initially
     }
 
@@ -34,49 +34,78 @@ public class GameManager : MonoBehaviourPunCallbacks
 
         PhotonNetwork.JoinOrCreateRoom("Game Room", new RoomOptions(), TypedLobby.Default);
     }
+public override void OnJoinedRoom()
+{
+    base.OnJoinedRoom();
 
-    public override void OnJoinedRoom()
+    Debug.Log("Joined room: " + PhotonNetwork.CurrentRoom.Name);
+
+    Debug.Log("No. of Players: " + PhotonNetwork.CurrentRoom.PlayerCount);
+
+    // Check if the required number of players has joined the room
+    if (PhotonNetwork.CurrentRoom.PlayerCount == 2)
     {
-        base.OnJoinedRoom();
-
-        if (PhotonNetwork.CurrentRoom.PlayerCount == 2)
-        {
-            StartGame();
-        }
+        Debug.Log("Starting game...");
+        StartGame();
     }
+    else
+    {
+        Debug.Log("Waiting for more players...");
+    }
+}
+public override void OnPlayerEnteredRoom(Photon.Realtime.Player newPlayer)
+{
+    Debug.Log("New player entered the room: " + newPlayer.NickName);
+    Debug.Log("Current room player count: " + PhotonNetwork.CurrentRoom.PlayerCount);
+    Debug.Log("isGameStarted: " + isGameStarted);
+
+    if (PhotonNetwork.CurrentRoom.PlayerCount == 2 && !isGameStarted)
+    {
+        StartGame();
+    }
+}
 
     private void StartGame()
+{
+    Debug.Log("StartGame() called");
+
+    // Check if all required components are assigned
+    if (playerPrefab == null)
     {
-        isGameStarted = true;
-
-        players = PhotonNetwork.PlayerList;
-        playerScores = new int[players.Length];
-
-        // Initialize player scores
-        for (int i = 0; i < playerScores.Length; i++)
-        {
-            playerScores[i] = 0;
-        }
-
-        // Determine the starting player
-        currentPlayerIndex = Random.Range(0, players.Length);
-
-        // Inform the players about the starting player
-        photonView.RPC("RPC_SetTurn", RpcTarget.All, currentPlayerIndex);
-
-        // Spawn players
-        for (int i = 0; i < players.Length; i++)
-        {
-            SpawnPlayer(i);
-        }
+        Debug.LogError("Player Prefab is not assigned.");
+        return;
     }
+
+    if (spawnPoint == null || spawnPoint.Length == 0)
+    {
+        Debug.LogError("Spawn Points are not assigned.");
+        return;
+    }
+
+// Get a random spawn point index
+        int spawnIndex = Random.Range(0, spawnPoint.Length);
+
+        // Instantiate a random player prefab at the selected spawn point
+        GameObject player = PhotonNetwork.Instantiate(playerPrefab[Random.Range(0, playerPrefab.Length)].name, spawnPoint[spawnIndex].position, spawnPoint[spawnIndex].rotation);
+        
+        // Set the player's position and rotation locally
+        player.transform.position = spawnPoint[spawnIndex].position;
+        player.transform.rotation = spawnPoint[spawnIndex].rotation;
+
+    // Set the isGameStarted flag to true
+    isGameStarted = true;
+}
+
+
 
     private void SpawnPlayer(int playerIndex)
     {
         Vector3 spawnPosition = GetPlayerSpawnPosition();
 
         // Instantiate the player prefab based on player index
-        GameObject playerObject = PhotonNetwork.Instantiate(playerPrefabs[playerIndex].name, spawnPosition, Quaternion.identity);
+        GameObject playerObject = PhotonNetwork.Instantiate(playerPrefab[playerIndex].name, spawnPosition, Quaternion.identity);
+
+        Debug.Log("Player prefab instantiated: " + playerObject.name);
 
         PlayerController playerController = playerObject.GetComponent<PlayerController>();
         playerController.InitializePlayer(players[playerIndex], playerIndex == 0); // Pass true for local player, false for remote players
