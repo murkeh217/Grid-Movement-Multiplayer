@@ -2,6 +2,7 @@ using UnityEngine;
 using Photon.Pun;
 using System.Collections;
 using Photon.Realtime;
+using TMPro;
 
 public class PlayerController : MonoBehaviourPunCallbacks, IPunObservable
 {
@@ -12,6 +13,7 @@ public class PlayerController : MonoBehaviourPunCallbacks, IPunObservable
     private bool isLocalPlayer = false;
     public bool IsLocalPlayer { get { return isLocalPlayer; } }
     private PhotonView photonView; // Reference to the PhotonView component
+    public int PlayerIndex { get; private set; }
 
 
    private void Awake()
@@ -60,14 +62,8 @@ public class PlayerController : MonoBehaviourPunCallbacks, IPunObservable
 
         isLocalPlayer = isLocal;
 
-        if (isLocalPlayer)
-        {
-            // Additional initialization logic for the local player
-        }
-        else
-        {
-            // Additional initialization logic for remote players
-        }
+         // Set the PlayerIndex based on the ActorNumber of the Photon player
+        PlayerIndex = player.ActorNumber;
     }
 
     public void SetTurn(bool isTurn)
