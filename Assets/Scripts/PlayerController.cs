@@ -10,7 +10,7 @@ public class PlayerController : MonoBehaviourPunCallbacks, IPunObservable
     private bool isMyTurn = false;
     private bool isLocalPlayer = false;
     public bool IsLocalPlayer { get { return isLocalPlayer; } }
-    private PhotonView photonView;
+    new private PhotonView photonView;
 
     private void Awake()
     {

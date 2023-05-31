@@ -42,6 +42,7 @@ MonoBehaviour:
   - RPC_InstantiatePlayer
   - RPC_SetTurn
   - EndTurn
+  - SyncMove
   DisableAutoOpenWizard: 1
   ShowSettings: 1
   DevRegionSetOnce: 1
