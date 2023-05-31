@@ -29,6 +29,8 @@ public class PlayerModel
     public Vector3 ZOffset { get; set; }               // Offset in the Z-axis direction
 
     public string Name { get; set; }
+
+    public float BlockDistance { get; set; }
     public PlayerModel()
     {
         // Set default values
@@ -61,5 +63,5 @@ public class PlayerModel
         ZOffset = Vector3.zero;
 
         Name = "";
-    }
+        BlockDistance = 2f;    }
 }

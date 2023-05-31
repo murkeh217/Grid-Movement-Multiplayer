@@ -57,45 +57,57 @@ public class PlayerController : MonoBehaviourPunCallbacks, IPunObservable
 
     private void Update()
     {
-        if (isLocalPlayer && isMyTurn)
+     /*   if (!isLocalPlayer || !isMyTurn)
         {
-            // Handle player input for their turn
-            if (Input.GetMouseButtonDown(0))
+            return;
+        }*/
+
+        // Handle player input for their turn
+        if (Input.GetMouseButtonDown(0))
+        {
+            var ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+            RaycastHit hit;
+
+            if (Physics.Raycast(ray, out hit, 100f, Model.WalkableMask))
             {
-                var ray = Camera.main.ScreenPointToRay(Input.mousePosition);
-                RaycastHit hit;
+                Vector3 targetPosition = new Vector3(hit.point.x, transform.position.y, hit.point.z);
+                Vector3 moveDir = (targetPosition - transform.position).normalized;
+                Vector3 blockDistance = moveDir * Model.BlockDistance;
+                Vector3 roundedBlockDistance = new Vector3(Mathf.Round(blockDistance.x), blockDistance.y, Mathf.Round(blockDistance.z));
 
-                if (Physics.Raycast(ray, out hit, 100f, Model.WalkableMask))
-                {
-                    Model.TargetPosition = new Vector3(hit.point.x, transform.position.y, hit.point.z);
-                    Model.Moving = true;
-                    Model.TargetFallHeight = Model.TargetPosition.y - Model.RayLength;
+                Model.TargetPosition = transform.position + roundedBlockDistance;
+                Model.Moving = true;
+                Model.TargetFallHeight = Model.TargetPosition.y - Model.RayLength;
 
-                    Debug.Log("Clicked to move to: " + Model.TargetPosition);
-                }
+                Debug.Log("Clicked to move to: " + Model.TargetPosition);
+
+                // Call Photon RPC to synchronize movement with other players
+                photonView.RPC("SyncMove", RpcTarget.All, Model.TargetPosition);
             }
+        }
 
-            if (Model.Moving && Vector3.Distance(transform.position, Model.TargetPosition) <= 0.1f)
+        if (Model.Moving)
+        {
+            transform.position = Model.TargetPosition;
+
+            Model.Moving = false;
+            Debug.Log("Reached target position: " + Model.TargetPosition);
+
+            // End the player's turn after reaching the target position
+            photonView.RPC("EndTurn", RpcTarget.All);
+        }
+
+        if (Model.Falling)
+        {
+            RaycastHit hit;
+
+            if (Physics.Raycast(transform.position, Vector3.down, out hit, Model.MaxFallCastDistance, Model.CollidableMask))
             {
-                Model.Moving = false;
-                Debug.Log("Reached target position: " + Model.TargetPosition);
+                Model.Falling = false;
 
-                // End the player's turn after reaching the target position
-                photonView.RPC("EndTurn", RpcTarget.All);
-            }
-
-            if (Model.Falling)
-            {
-                RaycastHit hit;
-
-                if (Physics.Raycast(transform.position, Vector3.down, out hit, Model.MaxFallCastDistance, Model.CollidableMask))
+                if (Mathf.Abs(transform.position.y - Model.TargetFallHeight) > 0.1f)
                 {
-                    Model.Falling = false;
-
-                    if (Mathf.Abs(transform.position.y - Model.TargetFallHeight) > 0.1f)
-                    {
-                        StartCoroutine(ResetPlayer());
-                    }
+                    StartCoroutine(ResetPlayer());
                 }
             }
         }
@@ -117,6 +129,16 @@ public class PlayerController : MonoBehaviourPunCallbacks, IPunObservable
     {
         // End the player's turn
         SetTurn(false);
+    }
+
+    [PunRPC]
+    private void SyncMove(Vector3 targetPosition)
+    {
+        Model.TargetPosition = targetPosition;
+        Model.Moving = true;
+        Model.TargetFallHeight = Model.TargetPosition.y - Model.RayLength;
+
+        Debug.Log("Synchronized movement: " + targetPosition);
     }
 
     public void OnPhotonSerializeView(PhotonStream stream, PhotonMessageInfo info)

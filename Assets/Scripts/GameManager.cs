@@ -7,7 +7,7 @@ using System.Linq;
 using UnityEngine.UI;
 using TMPro;
 
-public class GameManager : MonoBehaviourPunCallbacks, IPunObservable
+public class GameManager : MonoBehaviourPunCallbacks//, IPunObservable
 {
     private int currentPlayerIndex = 0;
     private Player[] players;
@@ -167,22 +167,26 @@ public override void OnPlayerEnteredRoom(Photon.Realtime.Player newPlayer)
         return -1; // Player not found, return an invalid index
     }
 
-    public void EndTurn()
-    {
-        // Disable the end turn button to prevent multiple clicks
-        endTurnButton.interactable = false;
+   public void EndTurn()
+{
+    // Disable the end turn button to prevent multiple clicks
+    endTurnButton.interactable = false;
 
-        // Increment the current player index and wrap around if necessary
-        currentPlayerIndex = (currentPlayerIndex + 1) % players.Length;
+    // Increment the current player index and wrap around if necessary
+    currentPlayerIndex = (currentPlayerIndex + 1) % players.Length;
 
-        // Inform the players about the new turn
-        photonView.RPC("RPC_SetTurn", RpcTarget.All, currentPlayerIndex);
-    }
+    // Inform the players about the new turn using Photon RPC
+    photonView.RPC("RPC_SetTurn", RpcTarget.All, currentPlayerIndex);
+
+        Debug.Log("Turn ended. Next player: " + players[currentPlayerIndex].NickName);
+
+}
+
 
     [PunRPC]
-    private void RPC_SetTurn(int playerIndex)
-    {
-        Debug.LogFormat("Setting turn for Player {0}.", playerIndex);
+private void RPC_SetTurn(int playerIndex)
+{
+    Debug.Log("Setting turn for Player " + playerIndex + ". Current player: " + players[playerIndex].NickName);
 
         currentPlayerIndex = playerIndex;
 
@@ -255,7 +259,7 @@ private void SetTurnTextVisibility(bool isVisible)
 
     }
 
-    public void OnPhotonSerializeView(PhotonStream stream, PhotonMessageInfo info)
+    /*public void OnPhotonSerializeView(PhotonStream stream, PhotonMessageInfo info)
     {
         if (stream.IsWriting)
         {
@@ -265,5 +269,5 @@ private void SetTurnTextVisibility(bool isVisible)
         {
             turnOwner = (int)stream.ReceiveNext();
         }
-    }
+    }*/
 }
