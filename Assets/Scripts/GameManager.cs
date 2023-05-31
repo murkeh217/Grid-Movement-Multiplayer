@@ -69,25 +69,35 @@ public class GameManager : MonoBehaviourPunCallbacks, IPunObservable
         }
     }
 
-    public override void OnPlayerEnteredRoom(Photon.Realtime.Player newPlayer)
-    {
-        Debug.Log("New player entered the room: " + newPlayer.NickName);
-        Debug.Log("Current room player count: " + PhotonNetwork.CurrentRoom.PlayerCount);
+public override void OnPlayerEnteredRoom(Photon.Realtime.Player newPlayer)
+{
+    Debug.Log("New player entered the room: " + newPlayer.NickName);
+    Debug.Log("Current room player count: " + PhotonNetwork.CurrentRoom.PlayerCount);
 
-        if (PhotonNetwork.CurrentRoom.PlayerCount == 2)
+    if (PhotonNetwork.CurrentRoom.PlayerCount == 2)
+    {
+        Debug.Log("Starting game...");
+        StartGame();
+    }
+    else
+    {
+        // Check if it's the local player's turn
+        if (turnOwner == PhotonNetwork.LocalPlayer.ActorNumber)
         {
-            Debug.Log("Starting game...");
-            StartGame();
+            // Show the turn text only if the end turn button is disabled
+            if (!endTurnButton.interactable)
+            {
+                turnText.gameObject.SetActive(true);
+            }
         }
         else
         {
-            // Check if it's the local player's turn
-            if (turnOwner == PhotonNetwork.LocalPlayer.ActorNumber)
-            {
-                endTurnButton.interactable = true;
-            }
+            // Hide the turn text for other players
+            turnText.gameObject.SetActive(false);
         }
     }
+}
+
 
     private void StartGame()
 {
@@ -218,9 +228,11 @@ public class GameManager : MonoBehaviourPunCallbacks, IPunObservable
         }
     }
 
-    private void SetTurnTextVisibility(bool isVisible)
+private void SetTurnTextVisibility(bool isVisible)
+{
+    if (PhotonNetwork.LocalPlayer.ActorNumber == players[currentPlayerIndex].ActorNumber)
     {
-        if (PhotonNetwork.LocalPlayer.ActorNumber == players[currentPlayerIndex].ActorNumber)
+        if (!endTurnButton.interactable)
         {
             turnText.gameObject.SetActive(isVisible);
         }
@@ -229,17 +241,18 @@ public class GameManager : MonoBehaviourPunCallbacks, IPunObservable
             turnText.gameObject.SetActive(false);
         }
     }
+    else
+    {
+        turnText.gameObject.SetActive(false);
+    }
+}
+
 
     private void SetTurnText(Player player)
     {
-        if (PhotonNetwork.LocalPlayer.ActorNumber == player.ActorNumber)
-        {
-            turnText.text = "Your Turn";
-        }
-        else
-        {
-            turnText.text = "Opponent's Turn";
-        }
+
+        turnText.text = "Your Turn";
+
     }
 
     public void OnPhotonSerializeView(PhotonStream stream, PhotonMessageInfo info)
