@@ -90,30 +90,31 @@ public class GameManager : MonoBehaviourPunCallbacks, IPunObservable
     }
 
     private void StartGame()
+{
+    players = PhotonNetwork.PlayerList;
+    currentPlayerIndex = 0;
+
+    // Set the initial turn text and visibility
+    SetTurnText(players[currentPlayerIndex]);
+
+    // Set the turn owner on the master client
+    if (PhotonNetwork.IsMasterClient)
     {
-        players = PhotonNetwork.PlayerList;
-        currentPlayerIndex = 0;
-
-        // Set the initial turn text and visibility
-        SetTurnText(players[currentPlayerIndex]);
-
-        // Set the turn owner on the master client
-        if (PhotonNetwork.IsMasterClient)
-        {
-            SetTurnOwner(players[currentPlayerIndex].ActorNumber);
-            endTurnButton.interactable = true; // Enable end turn button for the master client
-        }
-        else
-        {
-            endTurnButton.interactable = false; // Disable end turn button for other players initially
-        }
-
-        // Instantiate the player for the local client
-        if (PhotonNetwork.IsConnectedAndReady)
-        {
-            photonView.RPC("RPC_InstantiatePlayer", RpcTarget.All);
-        }
+        SetTurnOwner(players[currentPlayerIndex].ActorNumber);
+        endTurnButton.interactable = true; // Enable end turn button for the master client
     }
+    else
+    {
+        endTurnButton.interactable = false; // Disable end turn button for other players initially
+    }
+
+    // Instantiate the player for the local client
+    if (PhotonNetwork.IsConnectedAndReady && photonView.IsMine)
+    {
+        photonView.RPC("RPC_InstantiatePlayer", RpcTarget.All);
+    }
+}
+
 
     [PunRPC]
     private void RPC_InstantiatePlayer()
